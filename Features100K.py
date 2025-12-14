@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import scipy
-import matplotlib as plt
 import networkx as nx
 import itertools
 import collections
+from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 
@@ -15,10 +15,10 @@ def convert_categorical(df_X, _X):
     label_encoder = LabelEncoder()
     integer_encoded = label_encoder.fit_transform(values)
     # binary encode
-    onehot_encoder = OneHotEncoder(sparse=False)
+    onehot_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
     integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
     onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
-    df_X = df_X.drop(_X, 1)
+    df_X = df_X.drop(columns=[_X])
     for j in range(integer_encoded.max() + 1):
         df_X.insert(loc=j + 1, column=str(_X) + str(j + 1), value=onehot_encoded[:, j])
     return df_X
@@ -26,20 +26,22 @@ def convert_categorical(df_X, _X):
 
 alpha_coefs = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045]
 
-dataPath = 'datasets/ml-100k/'
+# base path for MovieLens 100K dataset (relative to repo root)
+dataPath = Path(__file__).resolve().parents[2] / 'data' / 'GHRS' / 'datasets' / 'ml-100k'
 
-df = pd.read_csv(dataPath+'ua.base', sep='\\t', engine='python', names=['UID', 'MID', 'rate', 'time'])
-df_user = pd.read_csv(dataPath+'u.user', sep='\\|', engine='python', names=['UID', 'age', 'gender', 'job', 'zip'])
+df = pd.read_csv(dataPath / 'ua.base', sep='\\t', engine='python', names=['UID', 'MID', 'rate', 'time'])
+df_user = pd.read_csv(dataPath / 'u.user', sep='\\|', engine='python', names=['UID', 'age', 'gender', 'job', 'zip'])
 
 df_user = convert_categorical(df_user, 'job')
 df_user = convert_categorical(df_user, 'gender')
 df_user['bin'] = pd.cut(df_user['age'], [0, 10, 20, 30, 40, 50, 100], labels=['1', '2', '3', '4', '5', '6'])
 df_user['age'] = df_user['bin']
 
-df_user = df_user.drop('bin', 1)
+df_user = df_user.drop(columns=['bin'])
 df_user = convert_categorical(df_user, 'age')
-df_user = df_user.drop('zip', 1)
+df_user = df_user.drop(columns=['zip'])
 
+storage_path = Path(__file__).resolve().parents[2] / 'output' / 'GHRS' / 'ml-100k'
 for alpha_coef in alpha_coefs:
     pairs = []
     grouped = df.groupby(['MID', 'rate'])
@@ -76,4 +78,4 @@ for alpha_coef in alpha_coefs:
     X_train = df_user[df_user.columns[1:]]
     X_train.fillna(0, inplace=True)
 
-    X_train.to_pickle("data100k/x_train_alpha("+str(alpha_coef)+").pkl")
+    X_train.to_pickle(storage_path +"/x_train_alpha("+str(alpha_coef)+").pkl")
